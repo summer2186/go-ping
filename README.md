@@ -76,6 +76,10 @@ finished, it calls the `OnFinish` callback.
 For a full ping example, see
 [cmd/ping/ping.go](https://github.com/go-ping/ping/blob/master/cmd/ping/ping.go).
 
+## bind interface support
+
+if you want to bind to interface, set Pinger.BindInterface field
+
 ## Installation
 
 ```
@@ -127,8 +131,8 @@ x/net/ipv4 and x/net/ipv6 packages.
 
 ### Plan 9 from Bell Labs
 
-There is no support for Plan 9. This is because the entire `x/net/ipv4` 
-and `x/net/ipv6` packages are not implemented by the Go programming 
+There is no support for Plan 9. This is because the entire `x/net/ipv4`
+and `x/net/ipv6` packages are not implemented by the Go programming
 language.
 
 ## Maintainers and Getting Help:

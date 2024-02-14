@@ -7,13 +7,13 @@ import (
 	"os/signal"
 	"time"
 
-	"github.com/go-ping/ping"
+	ping "go-ping"
 )
 
 var usage = `
 Usage:
 
-    ping [-c count] [-i interval] [-t timeout] [--privileged] host
+    ping [-c count] [-i interval] [-t timeout] [-I interface] [--privileged] host
 
 Examples:
 
@@ -34,6 +34,9 @@ Examples:
 
     # Send ICMP messages with a 100-byte payload
     ping -s 100 1.1.1.1
+
+	# ping with interface
+	ping -I eth0 1.1.1.1
 `
 
 func main() {
@@ -42,6 +45,7 @@ func main() {
 	count := flag.Int("c", -1, "")
 	size := flag.Int("s", 24, "")
 	ttl := flag.Int("l", 64, "TTL")
+	bindInterface := flag.String("I", "", "")
 	privileged := flag.Bool("privileged", false, "")
 	flag.Usage = func() {
 		fmt.Print(usage)
@@ -90,9 +94,14 @@ func main() {
 	pinger.Interval = *interval
 	pinger.Timeout = *timeout
 	pinger.TTL = *ttl
+	pinger.BindInterface = *bindInterface
 	pinger.SetPrivileged(*privileged)
 
-	fmt.Printf("PING %s (%s):\n", pinger.Addr(), pinger.IPAddr())
+	if *bindInterface != "" {
+		fmt.Printf("PING %s (%s), interface: %s:\n", pinger.Addr(), pinger.IPAddr(), *bindInterface)
+	} else {
+		fmt.Printf("PING %s (%s):\n", pinger.Addr(), pinger.IPAddr())
+	}
 	err = pinger.Run()
 	if err != nil {
 		fmt.Println("Failed to ping target host:", err)

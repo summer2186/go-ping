@@ -49,7 +49,6 @@
 // it calls the OnFinish callback.
 //
 // For a full ping example, see "cmd/ping/ping.go".
-//
 package ping
 
 import (
@@ -181,6 +180,9 @@ type Pinger struct {
 
 	// Source is the source IP address
 	Source string
+
+	// BindInterface bind the interface， e.g: eth0，only support linux
+	BindInterface string
 
 	// Channel and mutex used to communicate when the Pinger should stop between goroutines.
 	done chan interface{}
@@ -450,10 +452,7 @@ func (p *Pinger) run(conn packetConn) error {
 	return g.Wait()
 }
 
-func (p *Pinger) runLoop(
-	conn packetConn,
-	recvCh <-chan *packet,
-) error {
+func (p *Pinger) runLoop(conn packetConn, recvCh <-chan *packet) error {
 	logger := p.logger
 	if logger == nil {
 		logger = NoopLogger{}
@@ -567,10 +566,7 @@ func newExpBackoff(baseDelay time.Duration, maxExp int64) expBackoff {
 	return expBackoff{baseDelay: baseDelay, maxExp: maxExp}
 }
 
-func (p *Pinger) recvICMP(
-	conn packetConn,
-	recv chan<- *packet,
-) error {
+func (p *Pinger) recvICMP(conn packetConn, recv chan<- *packet) error {
 	// Start by waiting for 50 µs and increase to a possible maximum of ~ 100 ms.
 	expBackoff := newExpBackoff(50*time.Microsecond, 11)
 	delay := expBackoff.Get()
@@ -768,7 +764,7 @@ func (p *Pinger) sendICMP(conn packetConn) error {
 	return nil
 }
 
-func (p *Pinger) listen() (packetConn, error) {
+func (p *Pinger) listen2() (packetConn, error) {
 	var (
 		conn packetConn
 		err  error
@@ -782,6 +778,41 @@ func (p *Pinger) listen() (packetConn, error) {
 		var c icmpV6Conn
 		c.c, err = icmp.ListenPacket(ipv6Proto[p.protocol], p.Source)
 		conn = &c
+	}
+
+	if err != nil {
+		p.Stop()
+		return nil, err
+	}
+	return conn, nil
+}
+
+func (p *Pinger) listen() (packetConn, error) {
+	var (
+		conn packetConn
+		err  error
+	)
+
+	if p.BindInterface != "" {
+		if p.ipv4 {
+			var c icmpv4Conn2
+			c.c, err = listenPacket2(ipv4Proto[p.protocol], p.Source, p.BindInterface)
+			conn = &c
+		} else {
+			var c icmpV6Conn2
+			c.c, err = listenPacket2(ipv6Proto[p.protocol], p.Source, p.BindInterface)
+			conn = &c
+		}
+	} else {
+		if p.ipv4 {
+			var c icmpv4Conn
+			c.c, err = icmp.ListenPacket(ipv4Proto[p.protocol], p.Source)
+			conn = &c
+		} else {
+			var c icmpV6Conn
+			c.c, err = icmp.ListenPacket(ipv6Proto[p.protocol], p.Source)
+			conn = &c
+		}
 	}
 
 	if err != nil {
