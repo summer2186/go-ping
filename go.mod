@@ -1,4 +1,4 @@
-module https://github.com/summer2186/go-ping
+module github.com/summer2186/go-ping
 
 go 1.14
 
