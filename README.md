@@ -148,3 +148,11 @@ to the Gophers Slack org.
 ## Contributing
 
 Refer to [CONTRIBUTING.md](https://github.com/go-ping/ping/blob/master/CONTRIBUTING.md)
+
+
+## 修改说明
+
+相比上游版本，主要修改如下：
+
+* 增加绑定指定网卡发送ping报文，在某些系统中，如果仅通过绑定source ip可能会收不到报文，因此增加绑定指定网卡来发送报文。当系统中存在多个网卡，并且需要检测特定网卡的时候，适用该功能
+* 当解析域名的时候，可指定DNS，并且当绑定指定网卡或者绑定source ip的时候，可通过指定的网卡或者source ip来访问DNS服务器进行解析
