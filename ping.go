@@ -109,7 +109,7 @@ func New(addr string) *Pinger {
 		protocol:          "udp",
 		awaitingSequences: firstSequence,
 		TTL:               64,
-		logger:            StdLogger{Logger: log.New(log.Writer(), log.Prefix(), log.Flags())},
+		logger:            NoopLogger{},
 	}
 }
 
@@ -119,10 +119,17 @@ func NewPinger(addr string) (*Pinger, error) {
 	return p, p.Resolve()
 }
 
-func NewPinger2(addr string, bindInterface, dns string) (*Pinger, error) {
+func NewPinger2(addr string, network, bindInterface, dns string, isDebug bool) (*Pinger, error) {
 	p := New(addr)
+	p.Debug = isDebug
+	p.SetNetwork(network)
 	p.DNS = dns
 	p.BindInterface = bindInterface
+
+	if isDebug {
+		p.logger = StdLogger{Logger: log.New(log.Writer(), log.Prefix(), log.Flags())}
+	}
+
 	return p, p.Resolve()
 }
 
@@ -417,7 +424,9 @@ func (p *Pinger) resolve1() error {
 		return err
 	}
 
-	p.logger.Debugf("LookupIP: %#v", ipList)
+	for _, ip := range ipList {
+		p.logger.Debugf("lookup ip return: %s", ip.String())
+	}
 
 	if len(ipList) == 1 { // only one ip
 		p.ipv4 = isIPv4(ipList[0])

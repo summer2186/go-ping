@@ -13,7 +13,7 @@ import (
 var usage = `
 Usage:
 
-    ping [-c count] [-i interval] [-t timeout] [-I interface] [-dns dns] [-debug] [--privileged] host
+    ping [-c count] [-i interval] [-t timeout] [-I interface] [-dns dns] [-debug] [-4] [-6] [--privileged] host
 
 Examples:
 
@@ -40,6 +40,12 @@ Examples:
 
 	# use specify dns
 	ping -dns 8.8.8.8 www.google.com
+
+	# use ipv4
+	ping -4 www.google.com
+
+	# use ipv6
+	ping -6 www.google.com
 `
 
 func main() {
@@ -52,6 +58,8 @@ func main() {
 	privileged := flag.Bool("privileged", false, "")
 	dns := flag.String("dns", "", "")
 	enableDebug := flag.Bool("debug", false, "")
+	ipv4 := flag.Bool("4", false, "")
+	ipv6 := flag.Bool("6", false, "")
 
 	flag.Usage = func() {
 		fmt.Print(usage)
@@ -63,8 +71,15 @@ func main() {
 		return
 	}
 
+	network := "ip"
+	if *ipv4 {
+		network = "ip4"
+	} else if *ipv6 {
+		network = "ip6"
+	}
+
 	host := flag.Arg(0)
-	pinger, err := ping.NewPinger2(host, *bindInterface, *dns)
+	pinger, err := ping.NewPinger2(host, network, *bindInterface, *dns, *enableDebug)
 	if err != nil {
 		fmt.Println("ERROR:", err)
 		return
@@ -103,7 +118,6 @@ func main() {
 	//pinger.BindInterface = *bindInterface
 	pinger.SetPrivileged(*privileged)
 	//pinger.DNS = *dns
-	pinger.Debug = *enableDebug
 
 	if *bindInterface != "" {
 		fmt.Printf("PING %s (%s), interface: %s:\n", pinger.Addr(), pinger.IPAddr(), *bindInterface)
