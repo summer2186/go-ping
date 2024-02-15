@@ -53,12 +53,15 @@ package ping
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"log"
 	"math"
 	"math/rand"
 	"net"
+	"net/netip"
+	"os"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -113,6 +116,13 @@ func New(addr string) *Pinger {
 // NewPinger returns a new Pinger and resolves the address.
 func NewPinger(addr string) (*Pinger, error) {
 	p := New(addr)
+	return p, p.Resolve()
+}
+
+func NewPinger2(addr string, bindInterface, dns string) (*Pinger, error) {
+	p := New(addr)
+	p.DNS = dns
+	p.BindInterface = bindInterface
 	return p, p.Resolve()
 }
 
@@ -183,6 +193,9 @@ type Pinger struct {
 
 	// BindInterface bind the interface， e.g: eth0，only support linux
 	BindInterface string
+
+	// DNS use dns to resolve
+	DNS string
 
 	// Channel and mutex used to communicate when the Pinger should stop between goroutines.
 	done chan interface{}
@@ -323,6 +336,11 @@ func (p *Pinger) Resolve() error {
 	if len(p.addr) == 0 {
 		return errors.New("addr cannot be empty")
 	}
+
+	if p.Source != "" || p.BindInterface != "" || p.DNS != "" {
+		return p.resolve1()
+	}
+
 	ipaddr, err := net.ResolveIPAddr(p.network, p.addr)
 	if err != nil {
 		return err
@@ -333,6 +351,141 @@ func (p *Pinger) Resolve() error {
 	p.ipaddr = ipaddr
 
 	return nil
+}
+
+func (p *Pinger) resolve1() error {
+	p.logger.Debugf("resolve1")
+	// check is ip address
+	if ip, err := netip.ParseAddr(p.addr); err == nil {
+		addr := &net.IPAddr{
+			IP:   net.IP(ip.AsSlice()).To16(),
+			Zone: ip.Zone(),
+		}
+		p.ipv4 = isIPv4(addr.IP)
+		p.ipaddr = addr
+		return nil
+	}
+
+	r := net.Resolver{
+		PreferGo:     true,
+		StrictErrors: false,
+		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
+			d := net.Dialer{
+				ControlContext: func(ctx context.Context, network, address string, c syscall.RawConn) (err error) {
+					if p.BindInterface != "" {
+						p.logger.Debugf("bind to interface: %s, resolve dns", p.BindInterface)
+						_ = c.Control(func(fd uintptr) {
+							err = syscall.BindToDevice(int(fd), p.BindInterface)
+							if err != nil {
+								err = os.NewSyscallError("BindToDevice", err)
+							}
+						})
+					}
+
+					return
+				},
+			}
+
+			if p.Source != "" {
+				p.logger.Debugf("bind dns dialer to source: %s", p.Source)
+				ip, err := net.ResolveIPAddr("", p.Source)
+				if err != nil {
+					return nil, err
+				}
+
+				d.LocalAddr = ip
+			}
+
+			if p.DNS != "" {
+				address := net.JoinHostPort(p.DNS, "53")
+				p.logger.Debugf("dial dns: %s", address)
+				return d.DialContext(ctx, network, address)
+			} else {
+				p.logger.Debugf("dial dns: %s", address)
+				return d.DialContext(ctx, network, address)
+			}
+		},
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+
+	p.logger.Debugf("lookup ip: %s, network: %s", p.addr, p.network)
+	ipList, err := r.LookupIP(ctx, p.network, p.addr)
+	cancel()
+
+	if err != nil {
+		return err
+	}
+
+	p.logger.Debugf("LookupIP: %#v", ipList)
+
+	if len(ipList) == 1 { // only one ip
+		p.ipv4 = isIPv4(ipList[0])
+		p.ipaddr = &net.IPAddr{
+			IP:   ipList[0],
+			Zone: "",
+		}
+	}
+
+	switch p.network {
+	case "ip": // return first
+		p.ipv4 = isIPv4(ipList[0])
+		p.ipaddr = &net.IPAddr{
+			IP:   ipList[0],
+			Zone: "",
+		}
+
+		return nil
+	case "ip4":
+		for _, ip := range ipList {
+			if isIPv4(ip) {
+				p.ipv4 = true
+				p.ipaddr = &net.IPAddr{
+					IP:   ip,
+					Zone: "",
+				}
+				return nil
+			}
+		}
+
+		return &net.DNSError{
+			Err:         "no ipv4 addr",
+			Name:        p.addr,
+			Server:      "",
+			IsTimeout:   false,
+			IsTemporary: false,
+			IsNotFound:  true,
+		}
+	case "ip6":
+		for _, ip := range ipList {
+			if !isIPv4(ip) {
+				p.ipv4 = false
+				p.ipaddr = &net.IPAddr{
+					IP:   ip,
+					Zone: "",
+				}
+				return nil
+			}
+		}
+
+		return &net.DNSError{
+			Err:         "no ipv6 addr",
+			Name:        p.addr,
+			Server:      "",
+			IsTimeout:   false,
+			IsTemporary: false,
+			IsNotFound:  true,
+		}
+	default:
+		return &net.DNSError{
+			Err:         "unknown network",
+			Name:        p.addr,
+			Server:      "",
+			IsTimeout:   false,
+			IsTemporary: false,
+			IsNotFound:  false,
+		}
+	}
 }
 
 // SetAddr resolves and sets the ip address of the target host, addr can be a
