@@ -4,6 +4,7 @@
 package ping
 
 import (
+	"context"
 	"errors"
 	"net"
 	"os"
@@ -233,6 +234,7 @@ func listenPacket2(network, address, deviceToBind string) (*PacketConn, error) {
 				return nil, os.NewSyscallError("setsockopt", err)
 			}
 		}
+
 		sa, err := sockaddr(family, address)
 		if err != nil {
 			_ = syscall.Close(s)
@@ -253,7 +255,20 @@ func listenPacket2(network, address, deviceToBind string) (*PacketConn, error) {
 		c, cerr = net.FilePacketConn(f)
 		_ = f.Close()
 	default:
-		c, cerr = net.ListenPacket(network, address)
+		//fmt.Printf("call net.ListenPacket, network: %s, address: %s\n", network, address)
+		lc := net.ListenConfig{
+			Control: func(network, address string, c syscall.RawConn) (cErr error) {
+				_ = c.Control(func(fd uintptr) {
+					if err := syscall.BindToDevice(int(fd), deviceToBind); err != nil {
+						cErr = os.NewSyscallError("BindToDevice", err)
+					}
+				})
+
+				return
+			},
+			KeepAlive: 0,
+		}
+		c, cerr = lc.ListenPacket(context.Background(), network, address)
 	}
 	if cerr != nil {
 		return nil, cerr
