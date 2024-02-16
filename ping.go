@@ -370,6 +370,8 @@ func (p *Pinger) resolve1() error {
 		}
 		p.ipv4 = isIPv4(addr.IP)
 		p.ipaddr = addr
+
+		p.logger.Debugf("addr is ip, skip dns resolve")
 		return nil
 	}
 
@@ -957,10 +959,12 @@ func (p *Pinger) listen() (packetConn, error) {
 
 	if p.BindInterface != "" {
 		if p.ipv4 {
+			p.logger.Debugf("listenPacket2, network: %s, address: %s, interface: %s", ipv4Proto[p.protocol], p.Source, p.BindInterface)
 			var c icmpv4Conn2
 			c.c, err = listenPacket2(ipv4Proto[p.protocol], p.Source, p.BindInterface)
 			conn = &c
 		} else {
+			p.logger.Debugf("listenPacket2, network: %s, address: %s, interface: %s", ipv6Proto[p.protocol], p.Source, p.BindInterface)
 			var c icmpV6Conn2
 			c.c, err = listenPacket2(ipv6Proto[p.protocol], p.Source, p.BindInterface)
 			conn = &c
