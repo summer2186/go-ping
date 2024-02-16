@@ -130,7 +130,7 @@ func NewPinger2(addr string, network, bindInterface, dns string, isDebug bool) (
 		p.logger = StdLogger{Logger: log.New(log.Writer(), log.Prefix(), log.Flags())}
 	}
 
-	return p, p.Resolve()
+	return p, nil
 }
 
 // Pinger represents a packet sender/receiver.
