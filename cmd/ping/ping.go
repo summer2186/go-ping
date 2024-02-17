@@ -41,6 +41,9 @@ Examples:
 	# use specify dns
 	ping -dns 8.8.8.8 www.google.com
 
+	# use specify dns list (split by ';')
+	ping -dns "1.1.1.1;8.8.8.8" www.google.com
+
 	# use ipv4
 	ping -4 www.google.com
 
@@ -119,11 +122,6 @@ func main() {
 	pinger.SetPrivileged(*privileged)
 	//pinger.DNS = *dns
 
-	if *bindInterface != "" {
-		fmt.Printf("PING %s (%s), interface: %s:\n", pinger.Addr(), pinger.IPAddr(), *bindInterface)
-	} else {
-		fmt.Printf("PING %s (%s):\n", pinger.Addr(), pinger.IPAddr())
-	}
 	err = pinger.Run()
 	if err != nil {
 		fmt.Println("Failed to ping target host:", err)

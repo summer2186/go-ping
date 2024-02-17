@@ -1,11 +1,10 @@
 module github.com/summer2186/go-ping
+// module go-ping
 
 go 1.14
 
 require (
-	github.com/google/uuid v1.2.0
-	golang.org/x/net v0.0.0-20210316092652-d523dce5a7f4
-	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
+	github.com/google/uuid v1.6.0
+	golang.org/x/net v0.21.0
+	golang.org/x/sync v0.6.0
 )
-
-
