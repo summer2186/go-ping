@@ -8,6 +8,7 @@ import (
 	"time"
 
 	ping "github.com/summer2186/go-ping"
+	// ping "go-ping"
 )
 
 var usage = `
