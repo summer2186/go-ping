@@ -62,9 +62,11 @@ func (p *Pinger) resolve1() error {
 				}
 
 				if dns != "" {
-					address := net.JoinHostPort(dns, "53")
-					p.logger.Debugf("dial dns: %s", address)
-					return d.DialContext(ctx, network, address)
+					if strings.Index(dns, ":") < 0 {
+						dns = net.JoinHostPort(dns, "53")
+					}
+					p.logger.Debugf("dial dns: %s", dns)
+					return d.DialContext(ctx, network, dns)
 				} else {
 					p.logger.Debugf("dial dns: %s", address)
 					return d.DialContext(ctx, network, address)
